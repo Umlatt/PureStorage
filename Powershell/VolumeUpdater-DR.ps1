@@ -1,10 +1,12 @@
-************************************************************************************************************************************************************************************************************************************************************
- 
+# Version v3.1
+# Changes - Added two-way updating and confirmation for updates.
+
 # VARIABLES
 $arrayIP = "172.16.0.29"
-$hostgroupname = "delete-me"
 $pgroupname = "dummy-pg"
 $suffix = "_backup"
+
+# https://stackoverflow.com/questions/19168475/powershell-to-remove-text-from-a-string
  
  
 ######################################################################################################################################################
@@ -13,7 +15,7 @@ $suffix = "_backup"
 #Creating report filename
 $Invocation     = (Get-Variable MyInvocation -Scope 0).Value
 $rootpath       = Split-Path $Invocation.MyCommand.Path
-$datetime       = "{0:yyyyMMdd_HHmm}" -f (Get-Date)
+$datetime       = "{0:yyyyMMdd_HHmm}" -f (Get-Date
 $reportfilepath =  ($($Invocation.MyCommand).Name).TrimEnd(".ps1")
 $reportfilepath = "$rootpath\Reports\$reportfilepath-$datetime.txt"
  
@@ -26,12 +28,13 @@ Start-Transcript -path $reportfilepath -append | Out-Null
 ######################################################################################################################################################
 #  1. Connect to Pure Storage Array 
 ######################################################################################################################################################
-echo "*******************************************************************************************************"
-echo " Snap Volume Copy Script - v2.1"
-echo " ---"
-echo " Copy volumes from latest snapshot in protection group [$pgroupname] and attach to [$hostgroupname]"
-echo "*******************************************************************************************************"
-echo "1. Connect to Pure Storage array [$arrayIP]"
+Write-Host "*******************************************************************************************************"
+Write-Host " Snap Volume Copy Script - v3.1"
+Write-Host " ---"
+Write-Host " Overwrite volumes from the latest snapshot in the protection group [$pgroupname]"
+Write-Host "*******************************************************************************************************"
+Write-Host "`n1. Connect to Pure Storage array [$arrayIP]"
+Write-Host "-----------------------------------------------------------------------------------------------------------------------------------------`n"
 #Get authentication
 $Creds = Get-Credential
 #Connect to array
@@ -39,49 +42,75 @@ $FlashArray = New-PfaArray -EndPoint $arrayIP -Credentials $Creds -IgnoreCertifi
 #Get controller information
 Get-PfaControllers -Array $FlashArray
 $Controllers = Get-PfaControllers –Array $FlashArray
-echo $Controllers
  
 ######################################################################################################################################################
 #  2. Connect to Pure Storage Array 
 ######################################################################################################################################################
-echo "2. Get latest snap from $pgroupname"
+Write-Host "2. Get latest snap from $pgroupname"
+Write-Host "-----------------------------------------------------------------------------------------------------------------------------------------`n"
 $pgroupsnap = (Get-PfaProtectionGroupSnapshots -Array $FlashArray -Name $pgroupname)[-2]
 echo $pgroupsnap
  
 ######################################################################################################################################################
 #  3. Get volumes from snapshots 
 ######################################################################################################################################################
-echo "3. Get list of volumes from latest (complete) snapshot"
+Write-Host "3. Get list of volumes from latest (complete) snapshot"
+Write-Host "-----------------------------------------------------------------------------------------------------------------------------------------`n"
 $volumelist = ((Get-PfaProtectionGroupVolumeSnapshots -Array $FlashArray -Name $pgroupname).name | Select-String $pgroupsnap.name).Line
 echo $volumelist
- 
-######################################################################################################################################################
-#  4. Overwrite volumes from snap volume 
-######################################################################################################################################################
-echo "4. Overwrite the target volume from the latest snapshot..."
-$volcount = $volumelist.Length
 $snapshot = $pgroupsnap.name
-$hostgroupvolumes = Get-PfaHostGroupVolumeConnections -Array $FlashArray -HostGroupName $hostgroupname
+
+######################################################################################################################################################
+#  4. Get user confirmation 
+######################################################################################################################################################
+$sourceoverwritestring = "IAmGoingToOverwriteTheSourceVolumes"
+$backupoverwritestring = "DR"
+$examplesourcevolfull = $volumelist[0]
+$examplesourcevol = $examplesourcevolfull -replace ".*$snapshot."
+
+Write-Host "`n4. User confirmation to initiate."
+Write-Host "-----------------------------------------------------------------------------------------------------------------------------------------`n"
+Write-Host "The listed snapshot volumes above will be used to update/overwrite the volumes."
+Write-Host "Please type your preference (below), or type anything else to exit."
+Write-Host "Producuction`tTo update/overwrite the data in the production volumes, type `"$sourceoverwritestring`""
+$examplevol = $examplesourcevol -replace "$suffix.*"
+Write-Host "`t`t`t`t eg. [$examplesourcevolfull] -> [$examplevol]" -fore darkgray
+Write-Host "DR`t`t`t`tTo update/overwrite the data in the DR volumes, type `"$backupoverwritestring`""
+$examplevol = $examplesourcevol + $suffix
+Write-Host "`t`t`t`t eg. [$examplesourcevolfull] -> [$examplevol]" -fore darkgray
+Write-Host "The action will initiate immediately upon inputting your selection." -fore yellow
+$user_response = Read-Host "`t"
+if (($user_response.ToLower() -ne $backupoverwritestring.ToLower()) -and ($user_response.ToLower() -ne $sourceoverwritestring.ToLower())){
+    Write-Host "Your input was [$user_response].`nThat is not a valid option.`nThe program will now close.`n"
+    Stop-Transcript | Out-Null
+    exit
+}
+Write-Host "You have selected [$user_response]. Executing volume update/overwrites.`n"
+
+######################################################################################################################################################
+#  5. Overwrite volumes from snap volume 
+######################################################################################################################################################
+Write-Host "5. Overwrite the target volume from the latest snapshot..."
+Write-Host "-----------------------------------------------------------------------------------------------------------------------------------------`n"
+$volcount = $volumelist.Length
+$count = 0
 foreach ($sourcevolume in $volumelist)
 {
-    echo "-----------------------------------------------------------------------------------------------------------------------------------------`n"
-    $destinationvolume = $sourcevolume.replace("$snapshot.","") + $suffix
-    echo "STEP1: Updating [$destinationvolume] from [$sourcevolume]"
+    $count++
+    if ($user_response -eq $backupoverwritestring){
+        $destinationvolume = $sourcevolume.replace("$snapshot.","") + $suffix
+    }
+    else
+    {
+        $destinationvolume = $sourcevolume -replace ".*$snapshot." -replace "$suffix.*"
+        
+    }
+    Write-Host "VOL#[$count]: Updating [$destinationvolume] from [$sourcevolume]"
     New-PfaVolume -Array $FlashArray -Source $sourcevolume -VolumeName $destinationvolume -Overwrite
-    
-    echo "STEP2: Attaching [$destinationvolume] to [$hostgroupname]"
-    echo "Checking if volume already connected to host group."
-    if ($hostgroupvolumes.vol.Contains($destinationvolume)){
-       echo "Volume is already connected. No action needed." 
-    }
-    else {
-        echo "Volume is not connected to host group. Connecting volume now."
-        New-PfaHostGroupVolumeConnection -Array $FlashArray -HostGroupName $hostgroupname -VolumeName $destinationvolume
-    }
+    Write-Host "-----------------------------------------------------------------------------------------------------------------------------------------`n"
 }
- 
 ######################################################################################################################################################
-echo "`n`rProcess complete.`n`rThe script will now exit."
+Write-Host "`n`rThe script will now exit."
  
 #End report
 Stop-Transcript | Out-Null
