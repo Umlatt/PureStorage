@@ -99,8 +99,7 @@ foreach ($sourcevolume in $volumelist)
     }
     else
     {
-        $destinationvolume = $sourcevolume -replace ".*$snapshot." -replace "$suffix.*"
-        
+        $destinationvolume = $sourcevolume -replace ".*$snapshot." -replace "$suffix.*" 
     }
     Write-Host "VOL#[$count]: Updating [$destinationvolume] from [$sourcevolume]"
     New-PfaVolume -Array $FlashArray -Source $sourcevolume -VolumeName $destinationvolume -Overwrite
