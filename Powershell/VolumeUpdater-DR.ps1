@@ -4,10 +4,7 @@
 # VARIABLES
 $arrayIP = "172.16.0.29"
 $pgroupname = "dummy-pg"
-$suffix = "_backup"
-
-# https://stackoverflow.com/questions/19168475/powershell-to-remove-text-from-a-string
- 
+$suffix = "_backup" 
  
 ######################################################################################################################################################
 #  0. Create report information
