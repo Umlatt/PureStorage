@@ -12,7 +12,7 @@ $suffix = "_backup"
 #Creating report filename
 $Invocation     = (Get-Variable MyInvocation -Scope 0).Value
 $rootpath       = Split-Path $Invocation.MyCommand.Path
-$datetime       = "{0:yyyyMMdd_HHmm}" -f (Get-Date
+$datetime       = "{0:yyyyMMdd_HHmm}" -f (Get-Date)
 $reportfilepath =  ($($Invocation.MyCommand).Name).TrimEnd(".ps1")
 $reportfilepath = "$rootpath\Reports\$reportfilepath-$datetime.txt"
  
