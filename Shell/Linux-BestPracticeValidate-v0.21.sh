@@ -1,22 +1,26 @@
 #!/bin/bash
 printf "\n***********************************\n"
+printf "  Pure Storage Best Practice Check"
+printf "       v1.0 - 13 March 2020"
+printf "***********************************\n"
 printf "[1] OS information\n"
 prettyname=$(cat /etc/*release | grep -w PRETTY_NAME | sed "s/PRETTY_NAME=\"/""/g" | sed "s/\"/""/g")
-buildversion=$(cat /etc/*release | grep -w VERSION= | sed "s/VERSION=\"/""/g" | sed "s/\"/""/g")
-printf "OS Name: \t\t\033[0;36m$prettyname\n\033[0m"
-printf "OS Version: \t\t\033[0;36m$buildversion\n\033[0m"
+#buildversion=$(cat /etc/*release | grep -w VERSION= | sed "s/VERSION=\"/""/g" | sed "s/\"/""/g")
+buildversion=$(cat /etc/*release | grep -i release | head -n1 | sed 's/.*=//')
+printf "OS Name: \t\t\033[0;32m$prettyname\n\033[0m"
+printf "OS Version: \t\t\033[0;32m$buildversion\n\033[0m"
 kernelversion=$(uname -r)
-printf "Kernel version: \t\033[0;36m$kernelversion\n\033[0m"
+printf "Kernel version: \t\033[0;32m$kernelversion\n\033[0m"
 
 printf "\n***********************************\n"
 printf "\n[2] Config File - Block Devices (UDEV File)\n"
 blockdevicefile="NOK"
 if [ -f "/etc/udev/rules.d/99-pure-storage.rules" ]; then
-        cat /etc/udev/rules.d/99-pure-storage.rules > ./99-pure-storage.rules
+        #cat /etc/udev/rules.d/99-pure-storage.rules > ./99-pure-storage.rules
         blockdevicefile="/etc/udev/rules.d/99-pure-storage.rules"
 fi
 if [ -f "/lib/udev/rules.d/99-pure-storage.rules" ]; then 
-        cat /lib/udev/rules.d/99-pure-storage.rules > ./99-pure-storage.rules
+        #cat /lib/udev/rules.d/99-pure-storage.rules > ./99-pure-storage.rules
         blockdevicefile="/lib/udev/rules.d/99-pure-storage.rules"
 fi
 if [[ $blockdevicefile == "NOK" ]]; then
@@ -35,44 +39,44 @@ do
         printf " $device \t"
         vendor=$(cat /sys/block/$device/device/vendor | sed -e 's/[[:space:]]*$//' | awk '{print toupper($0)}')
         if [[ $vendor == "PURE" ]]; then
-                printf "[$vendor]\n"
+                printf "[$vendor]\t\t - "
                 timeoutval=$(cat /sys/block/$device/device/timeout)
                 if [[ $timeoutval == "60" ]]; then
-                        printf "  HBA Timeout \t\tOK\n"
+                        printf "HBA Timeout[OK]"
                 else
                 		blocksettings="NOK"
-                        printf "  \033[0;31mHBA Timeout \t\tNOT OK - The HBA timeout value is $timeoutval, but should be 60.\033[0m\n"
+                        printf "\033[0;31mHBA Timeout[NOT OK]\033[0m,"
                 fi
                 scheduler=$(cat /sys/block/$device/queue/scheduler | cut -d "[" -f2 | cut -d "]" -f1)
                 if [[ $scheduler == "noop" ]]; then
-                        printf "  I/O Scheduler \tOK\n"
+                        printf ",I/O Scheduler[OK]"
                 else
                 		blocksettings="NOK"
-                        printf "  \033[0;31mI/O Scheduler \tNOT OK - The I/O Scheduler is set as [$scheduler], but should be [noop].\033[0m\n"
+                        printf ",\033[0;31mI/O Scheduler[NOT OK]\033[0m,"
                 fi
                 max_sectors_kb=$(cat /sys/block/$device/queue/max_sectors_kb)
                 if [[ $max_sectors_kb == "4096" ]]; then
-                        printf "  Max I/O Size \t\tOK\n"
+                        printf ",Max I/O Size[OK]"
                 else
                 		blocksettings="NOK"
-                        printf "  \033[0;31mMax I/O Size \t\tNOT OK - The max I/O size is set as [$max_sectors_kb], but should be 4096.\033[0m\n"
+                        printf ",\033[0;31mMax I/O Size[NOT OK]\033[0m,"
                 fi  
                 add_random=$(cat /sys/block/$device/queue/add_random)
                 if [[ $add_random == "0" ]]; then
-                        printf "  Add Random \t\tOK\n"
+                        printf ",Add Random[OK]"
                 else
                 		blocksettings="NOK"
-                        printf "  \033[0;31mAdd Random \t\tNOT OK - Add Random is set as [$add_random], but should be 0.\033[0m\n"
+                        printf ",\033[0;31mAdd Random[NOT OK]\033[0m,"
                 fi
                 rq_affinity=$(cat /sys/block/$device/queue/rq_affinity)
                 if [[ $add_random == "0" ]]; then
-                        printf "  RQ Affinity \t\tOK\n"
+                        printf ",RQ Affinity[OK] -\n"
                 else
                 		blocksettings="NOK"
-                        printf "  \033[0;31mRQ Affinity \t\tNOT OK - RQ Affinity is set as [$rq_affinity], but should be 2.\033[0m\n"
+                        printf ",\033[0;31mRQ Affinity[NOT OK]\033[0m -\n"
                 fi              
         else
-                printf "[$vendor]\n  - Ignoring Device -\n"
+                printf "[$vendor]\t\t - Ignoring Device -\n"
         fi
 done
 
@@ -81,6 +85,7 @@ printf "\n[4] Driver - dm-multipath - Check if Device-Mapper Multipathing is ins
 multipathfound="OK"
 command -v multipath  || { multipathfound="NOK";}
 if [[ $multipathfound == "OK" ]]; then
+        driverversion=$(multipathd list | grep "multipath-tools")
         printf " Multipath driver is installed.\n"
         multipathfound=$(systemctl is-active multipathd.service) || multipathfound="NOTUSINGSYSTEMCTL"
         if [[ $multipathfound == "NOTUSINGSYSTEMCTL" ]]; then 
@@ -99,9 +104,9 @@ fi
 printf "\n***********************************\n"
 printf "\n[5] Config File - Check that there is an entry for Pure Storage Arrays\n"
 if [ -f "/etc/multipath.conf" ]; then 
-        cat /etc/multipath.conf > ./multipath.conf
+        # cat /etc/multipath.conf > ./multipath.conf
         printf " File found at [/etc/multipath.conf]\n"
-        if grep -Fq "PURE" multipath.conf; then
+        if grep -Fq "PURE" /etc/multipath.conf; then
                 printf " Pure storage entry found in config file.\n" 
                 mpathdevicefile="OK"
         else 
@@ -115,8 +120,9 @@ fi
 
 # Produce report
 printf "\n***********************************\n"
-printf "\nBest Practice - Report\n"
+printf "\n\033[1mBest Practice - Report - [$HOSTNAME]\033[0m\n\n"
 printf "[1] Linux Distribution Detected \t\033[0;36m$prettyname\n\033[0m"
+printf "    Build Version Detected \t\t\033[0;36m$buildversion\n\033[0m"
 printf "    Kernel Version Detected \t\t\033[0;36m$kernelversion\n\033[0m"
 compliance="PASS"
 if [[ $blockdevicefile == "NOK" ]]; then
@@ -124,10 +130,11 @@ if [[ $blockdevicefile == "NOK" ]]; then
         printf "Please ensure that there is a /*/udev/rules.d/99-pure-storage.rules file.\n\033[0m"
         compliance="FAIL"
 else
-        printf "[2] Config File - 99-pure-storage.rules\t\033[0;36mPASS*\n\033[0m"
+        printf "[2] Config File - Block Devices\t\t\033[0;32mPASS\n\033[0m"
+        printf "    Location\t\t\t\t\033[0;36m$blockdevicefile\n\033[0m"
 fi
 if [[ $blocksettings == "OK" ]]; then
-	printf "[3] Connected Devices - Block\t\t\033[0;36mPASS\n\033[0m"
+	printf "[3] Connected Devices - Block\t\t\033[0;32mPASS\n\033[0m"
 else
 	printf "[3] Connected Devices - Block\t\t\033[0;31mFAIL\n One or more of your block devices is incorrectly configured. "
 	printf "Please ensure that your /*/udev/rules.d/99-pure-storage.rules file is correctly configured for your current OS version.\n\033[0m"
@@ -135,7 +142,8 @@ else
 fi
 
 if [[ $multipathfound == "active" ]]; then
-        printf "[4] Driver - dm-multipath\t\t\033[0;36mPASS\n\033[0m"
+        printf "[4] Multipath Driver Status\t\t\033[0;32mPASS\n\033[0m"
+        printf "    dm-multipath version\t\t\033[0;36m$driverversion\n\033[0m"
 elif [[ $multipathfound == "active" ]]; then
         printf "[4] Driver - dm-multipath\t\t\033[0;31mFAIL\n The generic multipathing driver service is currently in an [multipathfound] state, but should be [active].\n\033[0m"
         compliance="FAIL"    
@@ -152,20 +160,20 @@ if [[ $emcpowerpathdetected != "NO" ]]; then
 fi
 
 if [[ $mpathdevicefile == "OK" ]]; then
-        printf "[5] Config File - multipath.conf\t\033[0;36mPASS*\n\033[0m"
+        printf "[5] Config File - Multipath Driver\t\033[0;32mPASS\033[0;33m*\n\033[0m"
+        printf "    Location\t\t\t\t\033[0;36m/etc/multipath.conf\n\033[0m"
 else
         printf "[5] Config File - multipath.conf\t\033[0;31mFAIL\n An entry for Pure Storage was not found in the multipath.conf file.\n\033[0m"
         compliance="FAIL"
 fi
 
 # Submit result
-if [[ $compliance == "PASS" ]]; then
-        printf "\n THIS HOST [$HOSTNAME] IS RUNNING ALL KNOWN BEST PRACTICES.\n\n"
-else
+if [[ $compliance != "PASS" ]]; then
         printf "\n \033[0;31mTHIS HOST [$HOSTNAME] IS NOT RUNNING ALL BEST PRACTICES.\033[0m\n"
         printf " PLEASE NOTE THAT SYSTEM STABILITY/MAXIMUM PERFORMANCE CANNOT BE EXPECTED.\n\n\033[0m"
 fi
 
-printf " \033[0;33m*Please confirm that the entries in the config files are correct for your OS version [$prettyname].\n"
-printf "  The config files (99-pure-storage.rules & multipath.conf) were copied to the root directory of this script.\033[0m\n"
+printf "\n\033[0;33m*Please confirm that the entries in the config files are correct for your OS version [$prettyname].\033[0m\n"
 printf "\n***********************************\n\n"
+printf "Please contact Data Sciences Corporation for additional support.\n"
+exit
