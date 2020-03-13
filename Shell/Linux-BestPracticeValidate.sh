@@ -1,7 +1,7 @@
 #!/bin/bash
 printf "\n***********************************\n"
 printf "  Pure Storage Best Practice Check"
-printf "       v0.9.5 - 13 March 2020"
+printf "       v1.0 - 13 March 2020"
 printf "***********************************\n"
 printf "[1] OS information\n"
 prettyname=$(cat /etc/*release | grep -w PRETTY_NAME | sed "s/PRETTY_NAME=\"/""/g" | sed "s/\"/""/g")
@@ -87,10 +87,11 @@ command -v multipath  || { multipathfound="NOK";}
 if [[ $multipathfound == "OK" ]]; then
         driverversion=$(multipathd list | grep "multipath-tools")
         printf " Multipath driver is installed.\n"
-        multipathfound=$(systemctl is-active multipathd.service) || multipathfound="NOTUSINGSYSTEMCTL"
-        if [[ $multipathfound == "NOTUSINGSYSTEMCTL" ]]; then 
+        # command -v multipathfound=$(systemctl is-active multipathd.service) || multipathfound="NOT_FOUND" # Shoudln't need all this crap, beacuse we have established that the driver is already there. Test with "stopped" mpath service (systemcl)
+        multipathfound=$(systemctl is-active multipathd.service) 
+        if [[ $multipathfound == "NOT_FOUND" ]]; then 
                 printf " \033[1;33m WARN - This distribution does not use systemctl.\n"
-                printf " \033[1;33m Cannot check the running state of the multipathd.service service.\n"
+                printf "  Cannot check the running state of the multipathd.service service.\033[0m\n"
         else
                 printf " The multipathd service is currently $multipathfound\n" 
         fi
@@ -126,8 +127,9 @@ printf "    Build Version Detected \t\t\033[0;36m$buildversion\n\033[0m"
 printf "    Kernel Version Detected \t\t\033[0;36m$kernelversion\n\033[0m"
 compliance="PASS"
 if [[ $blockdevicefile == "NOK" ]]; then
-        printf "[2] Config File - 99-pure-storage.rules\t\033[0;31mFAIL\n No 99-pure-storage.rules file exists in the standard paths. "
-        printf "Please ensure that there is a /*/udev/rules.d/99-pure-storage.rules file.\n\033[0m"
+        printf "[2] Config File - Block Devices\t\t\033[0;31mFAIL\033[0m\n"
+        printf "    No 99-pure-storage.rules file exists in the standard paths.\n"
+        printf "    Please ensure that there is a /*/udev/rules.d/99-pure-storage.rules file.\n"
         compliance="FAIL"
 else
         printf "[2] Config File - Block Devices\t\t\033[0;32mPASS\n\033[0m"
@@ -136,26 +138,28 @@ fi
 if [[ $blocksettings == "OK" ]]; then
 	printf "[3] Connected Devices - Block\t\t\033[0;32mPASS\n\033[0m"
 else
-	printf "[3] Connected Devices - Block\t\t\033[0;31mFAIL\n One or more of your block devices is incorrectly configured. "
-	printf "Please ensure that your /*/udev/rules.d/99-pure-storage.rules file is correctly configured for your current OS version.\n\033[0m"
+	printf "3] Connected Devices - Block\t\t\033[0;31mFAIL\033[0m\n One or more of your block devices is incorrectly configured. "
+	printf "Please ensure that your /*/udev/rules.d/99-pure-storage.rules file is correctly configured for your current OS version.\n"
         compliance="FAIL"
 fi
 
 if [[ $multipathfound == "active" ]]; then
         printf "[4] Multipath Driver Status\t\t\033[0;32mPASS\n\033[0m"
         printf "    dm-multipath version\t\t\033[0;36m$driverversion\n\033[0m"
-elif [[ $multipathfound == "active" ]]; then
-        printf "[4] Driver - dm-multipath\t\t\033[0;31mFAIL\n The generic multipathing driver service is currently in an [multipathfound] state, but should be [active].\n\033[0m"
+elif [[ $multipathfound == "NOK" ]]; then
+        printf "[4] Multipath Driver Status\t\t\033[0;31mFAIL\033[0m\n"
+        printf "    Please ensure that the generic linux multipathing driver is installed.\n"
         compliance="FAIL"    
 else
-        printf "[4] Driver - dm-multipath\t\t\033[0;31mFAIL\n Please ensure that the generic linux multipathing driver is installed.\n\033[0m"
+        printf "[4] Multipath Driver Status\t\t\033[0;31mFAIL\033[0m\n"
+        printf "    The generic multipathing driver service is currently in an [$multipathfound] state, but should be [active].\n"
         compliance="FAIL"
 fi
 if [[ $emcpowerpathdetected != "NO" ]]; then
-        printf "[!] Driver - EMC Powerpath \t\t\033[0;31mFAIL\n EMC Powerpath detected!!!\n"
+        printf "[!] Driver - EMC Powerpath \t\033[0;31mFAIL\033[0m\n EMC Powerpath detected!!!\n"
         printf " Please note that running EMC Powerpath with the genric linux dm-multipath driver can cause OS kernel panics!!!\n"
         printf " It is recommnded to remove EMC powerpath when using multiple vendor's storage subsystems.\n"
-        printf " For more info - https://access.redhat.com/site/solutions/110553\033[0m\n"
+        printf " For more info - https://access.redhat.com/site/solutions/110553\n"
         compliance="FAIL"
 fi
 
@@ -163,7 +167,8 @@ if [[ $mpathdevicefile == "OK" ]]; then
         printf "[5] Config File - Multipath Driver\t\033[0;32mPASS\033[0;33m*\n\033[0m"
         printf "    Location\t\t\t\t\033[0;36m/etc/multipath.conf\n\033[0m"
 else
-        printf "[5] Config File - multipath.conf\t\033[0;31mFAIL\n An entry for Pure Storage was not found in the multipath.conf file.\n\033[0m"
+        printf "[5] Config File - Multipath Driver\t\033[0;31mFAIL\033[0m\n"
+        printf "    An entry for Pure Storage was not found in the multipath.conf file.\n"
         compliance="FAIL"
 fi
 
