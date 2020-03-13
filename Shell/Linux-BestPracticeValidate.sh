@@ -1,7 +1,7 @@
 #!/bin/bash
 printf "\n***********************************\n"
 printf "  Pure Storage Best Practice Check"
-printf "       v1.0 - 13 March 2020"
+printf "       v0.9.5 - 13 March 2020"
 printf "***********************************\n"
 printf "[1] OS information\n"
 prettyname=$(cat /etc/*release | grep -w PRETTY_NAME | sed "s/PRETTY_NAME=\"/""/g" | sed "s/\"/""/g")
