@@ -45,7 +45,7 @@ $Controllers = Get-PfaControllers –Array $FlashArray
 ######################################################################################################################################################
 Write-Host "2. Get latest snap from $pgroupname"
 Write-Host "-----------------------------------------------------------------------------------------------------------------------------------------`n"
-$pgroupsnap = (Get-PfaProtectionGroupSnapshots -Array $FlashArray -Name $pgroupname)[-2]
+$pgroupsnap = (Get-PfaProtectionGroupSnapshots -Array $FlashArray -Name $pgroupname)[-1]
 echo $pgroupsnap
  
 ######################################################################################################################################################
